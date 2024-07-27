@@ -12,6 +12,7 @@ struct Package {
   name: String,
   winget_id: String,
   cmd: Option<Vec<String>>,
+  tags: Option<Vec<String>>,
 }
 
 fn main() {
@@ -28,11 +29,25 @@ fn main() {
 
   let contents = std::fs::read_to_string(filename).expect("Something went wrong reading the file");
 
-  let config: Config = serde_yml::from_str(&contents).unwrap();
+  let tags = if args.len() > 3 && (args[2] == "--tags" || args[2] == "-t") {
+    args[3].split(",").map(|s| s.to_string()).collect()
+  } else {
+    vec![]
+  };
+
+  println!("Tags: {}", tags.join(", "));
+
+  let config: Config = serde_yml::from_str(&contents).expect("Failed to parse config");
 
   println!("Found {} packages", config.packages.len());
 
   for package in config.packages {
+    if let Some(package_tags) = &package.tags {
+      if !tags.is_empty() && !tags.iter().any(|tag| package_tags.contains(tag)) {
+        continue;
+      }
+    }
+
     println!();
     println!("Installing package: {}", package.name);
 
