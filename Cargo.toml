@@ -9,3 +9,5 @@ license = "MIT"
 repository = "https://github.com/The-Noah/innit"
 
 [dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_yml = "0.0.11"
