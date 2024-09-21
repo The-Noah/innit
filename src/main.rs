@@ -1,4 +1,8 @@
-use std::{fs, path::PathBuf, process::Command};
+use std::{
+  fs,
+  path::PathBuf,
+  process::{Command, Stdio},
+};
 
 use serde::Deserialize;
 
@@ -65,6 +69,20 @@ fn main() {
       println!("Custom command(s): {}", cmd.join(", "));
     }
 
+    let result = Command::new("winget").arg("list").arg("-q").arg(&package.winget_id).stdout(Stdio::null()).status();
+
+    match result {
+      Ok(status) => {
+        if status.success() {
+          println!("Package already installed. Skipping");
+          continue;
+        }
+      }
+      Err(error) => {
+        println!("Failed to find package info: {}", error);
+      }
+    }
+
     let result = Command::new("winget")
       .arg("install")
       .arg(&package.winget_id)
@@ -72,6 +90,7 @@ fn main() {
       .arg("--silent")
       .arg("--accept-package-agreements")
       .arg("--disable-interactivity")
+      .stdout(Stdio::null())
       .status();
 
     match result {
