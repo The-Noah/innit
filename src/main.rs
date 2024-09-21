@@ -100,7 +100,7 @@ fn main() {
             }
           }
           Err(error) => {
-            println!("Failed to find package info: {}", error);
+            eprintln!("Failed to find package info: {}", error);
           }
         }
 
@@ -129,23 +129,23 @@ fn main() {
                       if status.success() {
                         println!("Command executed successfully");
                       } else {
-                        println!("Failed to execute command");
+                        eprintln!("Failed to execute command");
                         break;
                       }
                     }
                     Err(error) => {
-                      println!("Failed to execute command: {}", error);
+                      eprintln!("Failed to execute command: {}", error);
                       break;
                     }
                   }
                 }
               }
             } else {
-              println!("Failed to install package");
+              eprintln!("Failed to install package");
             }
           }
           Err(error) => {
-            println!("Failed to install package: {}", error);
+            eprintln!("Failed to install package: {}", error);
           }
         }
       }
