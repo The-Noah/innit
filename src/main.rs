@@ -15,6 +15,8 @@ enum Action {
   FileLink(FileLink),
   #[serde(rename = "github.repo")]
   GitHubRepo(GitHubRepo),
+  #[serde(rename = "command.run")]
+  CommandRun(CommandRun),
 }
 
 #[derive(Deserialize)]
@@ -26,7 +28,6 @@ struct Config {
 struct Package {
   name: String,
   winget_id: String,
-  cmd: Option<Vec<String>>,
   tags: Option<Vec<String>>,
 }
 
@@ -42,6 +43,11 @@ struct FileLink {
 struct GitHubRepo {
   repo: String,
   dest: String,
+}
+
+#[derive(Deserialize)]
+struct CommandRun {
+  command: String,
 }
 
 fn default_hard() -> bool {
@@ -87,10 +93,6 @@ fn main() {
         println!("Installing package: {}", package.name);
         println!("Winget ID: {}", package.winget_id);
 
-        if let Some(cmd) = &package.cmd {
-          println!("Custom command(s): {}", cmd.join(", "));
-        }
-
         let result = Command::new("winget").arg("list").arg("-q").arg(&package.winget_id).stdout(Stdio::null()).status();
         match result {
           Ok(status) => {
@@ -118,28 +120,6 @@ fn main() {
           Ok(status) => {
             if status.success() {
               println!("Package installed successfully");
-
-              if let Some(cmd) = package.cmd {
-                for command in cmd {
-                  println!("Running command: {}", command);
-
-                  let result = Command::new("cmd").arg("/C").arg(command).status();
-                  match result {
-                    Ok(status) => {
-                      if status.success() {
-                        println!("Command executed successfully");
-                      } else {
-                        eprintln!("Failed to execute command");
-                        break;
-                      }
-                    }
-                    Err(error) => {
-                      eprintln!("Failed to execute command: {}", error);
-                      break;
-                    }
-                  }
-                }
-              }
             } else {
               eprintln!("Failed to install package");
             }
@@ -234,6 +214,26 @@ fn main() {
           }
           Err(error) => {
             eprintln!("Failed to clone repository: {}", error);
+          }
+        }
+      }
+      Action::CommandRun(command) => {
+        println!();
+        println!("Running command: {}", command.command);
+
+        let result = Command::new("cmd").arg("/C").arg(command.command).stdout(Stdio::null()).status();
+        match result {
+          Ok(status) => {
+            if status.success() {
+              println!("Command executed successfully");
+            } else {
+              eprintln!("Failed to execute command");
+              break;
+            }
+          }
+          Err(error) => {
+            eprintln!("Failed to execute command: {}", error);
+            break;
           }
         }
       }

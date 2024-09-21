@@ -28,11 +28,14 @@ actions:
   - action: package.install
     name: nvm
     winget_id: CoreyButler.NVMforWindows
-    cmd:
-      - nvm install lts
-      - sudo nvm use lts
     tags:
       - dev
+
+  - action: command.run
+    command: nvm install lts
+
+  - action: command.run
+    command: sudo nvm use lts
 
   - action: github.repo
     repo: The-Noah/dotfiles
