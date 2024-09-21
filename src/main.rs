@@ -191,19 +191,26 @@ fn main() {
         final_dest.push(repo.repo.split("/").collect::<Vec<&str>>().last().unwrap());
 
         if final_dest.exists() {
-          eprintln!("Repository target already exists, pulling...");
+          let mut git_dir = final_dest.clone();
+          git_dir.push(".git");
 
-          match Command::new("git").current_dir(final_dest).arg("pull").stdout(Stdio::null()).status() {
-            Ok(status) => {
-              if status.success() {
-                println!("Repository updated");
-              } else {
-                eprintln!("Failed to update repository")
+          if git_dir.exists() {
+            println!("Repository target already exists, pulling...");
+
+            match Command::new("git").current_dir(final_dest).arg("pull").stdout(Stdio::null()).status() {
+              Ok(status) => {
+                if status.success() {
+                  println!("Repository updated");
+                } else {
+                  eprintln!("Failed to update repository")
+                }
+              }
+              Err(error) => {
+                eprintln!("Failed to update repository: {}", error);
               }
             }
-            Err(error) => {
-              eprintln!("Failed to update repository: {}", error);
-            }
+          } else {
+            eprintln!("Directory exists but isn't git repository");
           }
 
           continue;
