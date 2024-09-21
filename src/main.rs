@@ -6,11 +6,21 @@ use std::{
 
 use serde::Deserialize;
 
+enum ActionResult {
+  Success,
+  Failure(String),
+  Skipped(String),
+}
+
+trait ActionHandler {
+  fn run(&self, tags: &[String]) -> ActionResult;
+}
+
 #[derive(Deserialize)]
 #[serde(tag = "action")]
 enum Action {
   #[serde(rename = "package.install")]
-  PackageInstall(Package),
+  PackageInstall(PackageInstall),
   #[serde(rename = "file.link")]
   FileLink(FileLink),
   #[serde(rename = "github.repo")]
@@ -19,16 +29,76 @@ enum Action {
   CommandRun(CommandRun),
 }
 
+impl Action {
+  fn inner_ref(&self) -> &dyn ActionHandler {
+    match self {
+      Action::PackageInstall(action) => action,
+      Action::FileLink(action) => action,
+      Action::GitHubRepo(action) => action,
+      Action::CommandRun(action) => action,
+    }
+  }
+}
+
 #[derive(Deserialize)]
 struct Config {
   actions: Vec<Action>,
 }
 
 #[derive(Deserialize)]
-struct Package {
+struct PackageInstall {
   name: String,
   winget_id: String,
   tags: Option<Vec<String>>,
+}
+
+impl ActionHandler for PackageInstall {
+  fn run(&self, tags: &[String]) -> ActionResult {
+    if let Some(package_tags) = &self.tags {
+      if !tags.is_empty() && !tags.iter().any(|tag| package_tags.contains(tag)) {
+        return ActionResult::Skipped("no matching tags".to_string());
+      }
+    }
+
+    println!();
+    println!("Installing package: {}", self.name);
+    println!("Winget ID: {}", self.winget_id);
+
+    let result = Command::new("winget").arg("list").arg("-q").arg(&self.winget_id).stdout(Stdio::null()).status();
+    match result {
+      Ok(status) => {
+        if status.success() {
+          return ActionResult::Skipped("already installed".to_string());
+        }
+      }
+      Err(error) => {
+        eprintln!("Failed to find package info: {}", error);
+      }
+    }
+
+    let result = Command::new("winget")
+      .arg("install")
+      .arg(&self.winget_id)
+      .arg("--exact")
+      .arg("--silent")
+      .arg("--accept-package-agreements")
+      .arg("--disable-interactivity")
+      .stdout(Stdio::null())
+      .status();
+
+    match result {
+      Ok(status) => {
+        if !status.success() {
+          return ActionResult::Failure("unknown error".to_string());
+        }
+      }
+      Err(error) => {
+        return ActionResult::Failure(error.to_string());
+      }
+    }
+
+    ActionResult::Success
+  }
 }
 
 #[derive(Deserialize)]
@@ -39,10 +109,108 @@ struct FileLink {
   hard: bool,
 }
 
+fn default_hard() -> bool {
+  false
+}
+
+impl ActionHandler for FileLink {
+  fn run(&self, tags: &[String]) -> ActionResult {
+    let src = path::absolute(PathBuf::from(evaluate_vars(&self.src))).unwrap();
+    let dest = path::absolute(PathBuf::from(evaluate_vars(&self.dest))).unwrap();
+
+    println!();
+    println!("Symlinking file: {}", src.file_name().unwrap().to_string_lossy());
+
+    if dest.exists() && !dest.is_symlink() {
+      let mut new_dest = dest.clone();
+      new_dest.set_file_name(format!("{}.bak", dest.file_name().unwrap().to_string_lossy()));
+
+      fs::rename(dest.clone(), new_dest).unwrap();
+    }
+
+    fs::remove_file(&dest).unwrap();
+
+    if self.hard {
+      fs::hard_link(&src, &dest).unwrap();
+    } else {
+      #[cfg(unix)]
+      {
+        std::os::unix::fs::symlink(&src, &dest).unwrap();
+      }
+
+      #[cfg(windows)]
+      {
+        if dest.is_dir() {
+          std::os::windows::fs::symlink_dir(&src, &dest).unwrap();
+        } else {
+          std::os::windows::fs::symlink_file(&src, &dest).unwrap();
+        }
+      }
+    }
+
+    ActionResult::Success
+  }
+}
+
 #[derive(Deserialize)]
 struct GitHubRepo {
   repo: String,
   dest: String,
+}
+
+impl ActionHandler for GitHubRepo {
+  fn run(&self, tags: &[String]) -> ActionResult {
+    println!();
+    println!("Cloning GitHub repository {}...", self.repo);
+
+    let dest = path::absolute(PathBuf::from(evaluate_vars(&self.dest))).unwrap();
+
+    let mut final_dest = dest.clone();
+    final_dest.push(self.repo.split("/").collect::<Vec<&str>>().last().unwrap());
+
+    if final_dest.exists() {
+      let mut git_dir = final_dest.clone();
+      git_dir.push(".git");
+
+      if git_dir.exists() {
+        println!("Repository target already exists, pulling...");
+
+        match Command::new("git").current_dir(final_dest).arg("pull").stdout(Stdio::null()).status() {
+          Ok(status) => {
+            if !status.success() {
+              return ActionResult::Failure("unknown git error".to_string());
+            }
+          }
+          Err(error) => {
+            return ActionResult::Failure(error.to_string());
+          }
+        }
+      } else {
+        return ActionResult::Failure("directory exists but isn't git repository".to_string());
+      }
+
+      return ActionResult::Success;
+    }
+
+    match Command::new("git")
+      .current_dir(dest)
+      .arg("clone")
+      .arg(format!("https://github.com/{}.git", self.repo))
+      .stdout(Stdio::null())
+      .status()
+    {
+      Ok(status) => {
+        if !status.success() {
+          return ActionResult::Failure("unknown git error".to_string());
+        }
+      }
+      Err(error) => {
+        return ActionResult::Failure(error.to_string());
+      }
+    }
+
+    ActionResult::Success
+  }
 }
 
 #[derive(Deserialize)]
@@ -50,8 +218,25 @@ struct CommandRun {
   command: String,
 }
 
-fn default_hard() -> bool {
-  false
+impl ActionHandler for CommandRun {
+  fn run(&self, tags: &[String]) -> ActionResult {
+    println!();
+    println!("Running command: {}", self.command);
+
+    let result = Command::new("cmd").arg("/C").arg(self.command.clone()).stdout(Stdio::null()).status();
+    match result {
+      Ok(status) => {
+        if !status.success() {
+          return ActionResult::Failure("failed to execute command for unknown reason".to_string());
+        }
+      }
+      Err(error) => {
+        return ActionResult::Failure(error.to_string());
+      }
+    }
+
+    ActionResult::Success
+  }
 }
 
 fn main() {
@@ -81,166 +266,14 @@ fn main() {
   println!("Found {} actions", config.actions.len());
 
   for action in config.actions {
-    match action {
-      Action::PackageInstall(package) => {
-        if let Some(package_tags) = &package.tags {
-          if !tags.is_empty() && !tags.iter().any(|tag| package_tags.contains(tag)) {
-            continue;
-          }
-        }
-
-        println!();
-        println!("Installing package: {}", package.name);
-        println!("Winget ID: {}", package.winget_id);
-
-        let result = Command::new("winget").arg("list").arg("-q").arg(&package.winget_id).stdout(Stdio::null()).status();
-        match result {
-          Ok(status) => {
-            if status.success() {
-              println!("Package already installed. Skipping");
-              continue;
-            }
-          }
-          Err(error) => {
-            eprintln!("Failed to find package info: {}", error);
-          }
-        }
-
-        let result = Command::new("winget")
-          .arg("install")
-          .arg(&package.winget_id)
-          .arg("--exact")
-          .arg("--silent")
-          .arg("--accept-package-agreements")
-          .arg("--disable-interactivity")
-          .stdout(Stdio::null())
-          .status();
-
-        match result {
-          Ok(status) => {
-            if status.success() {
-              println!("Package installed successfully");
-            } else {
-              eprintln!("Failed to install package");
-            }
-          }
-          Err(error) => {
-            eprintln!("Failed to install package: {}", error);
-          }
-        }
-      }
-      Action::FileLink(file) => {
-        let src = path::absolute(PathBuf::from(evaluate_vars(file.src))).unwrap();
-        let dest = path::absolute(PathBuf::from(evaluate_vars(file.dest))).unwrap();
-
-        println!();
-        println!("Symlinking file: {}", src.file_name().unwrap().to_string_lossy());
-
-        if dest.exists() && !dest.is_symlink() {
-          let mut new_dest = dest.clone();
-          new_dest.set_file_name(format!("{}.bak", dest.file_name().unwrap().to_string_lossy()));
-
-          fs::rename(dest.clone(), new_dest).unwrap();
-        }
-
-        fs::remove_file(&dest).unwrap();
-
-        if file.hard {
-          fs::hard_link(&src, &dest).unwrap();
-        } else {
-          #[cfg(unix)]
-          {
-            std::os::unix::fs::symlink(&src, &dest).unwrap();
-          }
-
-          #[cfg(windows)]
-          {
-            if dest.is_dir() {
-              std::os::windows::fs::symlink_dir(&src, &dest).unwrap();
-            } else {
-              std::os::windows::fs::symlink_file(&src, &dest).unwrap();
-            }
-          }
-        }
-      }
-      Action::GitHubRepo(repo) => {
-        println!();
-        println!("Cloning GitHub repository {}...", repo.repo);
-
-        let dest = path::absolute(PathBuf::from(evaluate_vars(repo.dest))).unwrap();
-
-        let mut final_dest = dest.clone();
-        final_dest.push(repo.repo.split("/").collect::<Vec<&str>>().last().unwrap());
-
-        if final_dest.exists() {
-          let mut git_dir = final_dest.clone();
-          git_dir.push(".git");
-
-          if git_dir.exists() {
-            println!("Repository target already exists, pulling...");
-
-            match Command::new("git").current_dir(final_dest).arg("pull").stdout(Stdio::null()).status() {
-              Ok(status) => {
-                if status.success() {
-                  println!("Repository updated");
-                } else {
-                  eprintln!("Failed to update repository")
-                }
-              }
-              Err(error) => {
-                eprintln!("Failed to update repository: {}", error);
-              }
-            }
-          } else {
-            eprintln!("Directory exists but isn't git repository");
-          }
-
-          continue;
-        }
-
-        match Command::new("git")
-          .current_dir(dest)
-          .arg("clone")
-          .arg(format!("https://github.com/{}.git", repo.repo))
-          .stdout(Stdio::null())
-          .status()
-        {
-          Ok(status) => {
-            if status.success() {
-              println!("Repository cloned");
-            } else {
-              eprintln!("Failed to clone repository")
-            }
-          }
-          Err(error) => {
-            eprintln!("Failed to clone repository: {}", error);
-          }
-        }
-      }
-      Action::CommandRun(command) => {
-        println!();
-        println!("Running command: {}", command.command);
-
-        let result = Command::new("cmd").arg("/C").arg(command.command).stdout(Stdio::null()).status();
-        match result {
-          Ok(status) => {
-            if status.success() {
-              println!("Command executed successfully");
-            } else {
-              eprintln!("Failed to execute command");
-              break;
-            }
-          }
-          Err(error) => {
-            eprintln!("Failed to execute command: {}", error);
-            break;
-          }
-        }
-      }
-    };
+    match action.inner_ref().run(&tags) {
+      ActionResult::Success => println!("Success"),
+      ActionResult::Failure(reason) => eprintln!("Failure: {}", reason),
+      ActionResult::Skipped(reason) => println!("Skipped: {}", reason),
+    }
   }
 }
 
-fn evaluate_vars(text: String) -> String {
+fn evaluate_vars(text: &str) -> String {
   text.replace("{{ user.home }}", &dirs::home_dir().unwrap().display().to_string())
 }
