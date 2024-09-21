@@ -5,18 +5,21 @@ Innit annoying when you have to setup a new PC?
 ## Example Config
 
 ```yaml
-packages:
-  - name: 1password
+actions:
+  - action: package.install
+    name: 1password
     winget_id: AgileBits.1Password
     tags:
       - core
 
-  - name: 7zip
+  - action: package.install
+    name: 7zip
     winget_id: 7zip.7zip
     tags:
       - tools
 
-  - name: nvm
+  - action: package.install
+    name: nvm
     winget_id: CoreyButler.NVMforWindows
     cmd:
       - nvm install lts
@@ -24,10 +27,15 @@ packages:
     tags:
       - dev
 
-  - name: paint.net
+  - action: package.install
+    name: paint.net
     winget_id: dotPDN.PaintDotNet
     tags:
       - tools
+
+  - action: file.link
+    src: C:\dotfiles\settings.json
+    dest: C:\Program Files\My App\settings.json
 ```
 
 ## Usage
