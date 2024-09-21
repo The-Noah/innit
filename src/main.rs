@@ -13,6 +13,8 @@ enum Action {
   PackageInstall(Package),
   #[serde(rename = "file.link")]
   FileLink(FileLink),
+  #[serde(rename = "github.repo")]
+  GitHubRepo(GitHubRepo),
 }
 
 #[derive(Deserialize)]
@@ -20,7 +22,7 @@ struct Config {
   actions: Vec<Action>,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize)]
 struct Package {
   name: String,
   winget_id: String,
@@ -28,12 +30,18 @@ struct Package {
   tags: Option<Vec<String>>,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize)]
 struct FileLink {
   src: String,
   dest: String,
   #[serde(default = "default_hard")]
   hard: bool,
+}
+
+#[derive(Deserialize)]
+struct GitHubRepo {
+  repo: String,
+  dest: PathBuf,
 }
 
 fn default_hard() -> bool {
@@ -172,6 +180,51 @@ fn main() {
             } else {
               std::os::windows::fs::symlink_file(&src, &dest).unwrap();
             }
+          }
+        }
+      }
+      Action::GitHubRepo(repo) => {
+        println!();
+        println!("Cloning GitHub repository {}...", repo.repo);
+
+        let mut final_dest = repo.dest.clone();
+        final_dest.push(repo.repo.split("/").collect::<Vec<&str>>().last().unwrap());
+
+        if final_dest.exists() {
+          eprintln!("Repository target already exists, pulling...");
+
+          match Command::new("git").current_dir(final_dest).arg("pull").stdout(Stdio::null()).status() {
+            Ok(status) => {
+              if status.success() {
+                println!("Repository updated");
+              } else {
+                eprintln!("Failed to update repository")
+              }
+            }
+            Err(error) => {
+              eprintln!("Failed to update repository: {}", error);
+            }
+          }
+
+          continue;
+        }
+
+        match Command::new("git")
+          .current_dir(repo.dest)
+          .arg("clone")
+          .arg(format!("https://github.com/{}.git", repo.repo))
+          .stdout(Stdio::null())
+          .status()
+        {
+          Ok(status) => {
+            if status.success() {
+              println!("Repository cloned");
+            } else {
+              eprintln!("Failed to clone repository")
+            }
+          }
+          Err(error) => {
+            eprintln!("Failed to clone repository: {}", error);
           }
         }
       }
