@@ -1,10 +1,11 @@
-use std::process::Command;
+use std::{fs, path::PathBuf, process::Command};
 
 use serde::Deserialize;
 
 #[derive(Deserialize)]
 struct Config {
-  packages: Vec<Package>,
+  packages: Option<Vec<Package>>,
+  files: Option<Vec<File>>,
 }
 
 #[derive(Deserialize)]
@@ -13,6 +14,12 @@ struct Package {
   winget_id: String,
   cmd: Option<Vec<String>>,
   tags: Option<Vec<String>>,
+}
+
+#[derive(Deserialize)]
+struct File {
+  src: String,
+  dest: String,
 }
 
 fn main() {
@@ -39,9 +46,11 @@ fn main() {
 
   let config: Config = serde_yml::from_str(&contents).expect("Failed to parse config");
 
-  println!("Found {} packages", config.packages.len());
+  let packages = config.packages.unwrap_or_default();
 
-  for package in config.packages {
+  println!("Found {} packages", packages.len());
+
+  for package in packages {
     if let Some(package_tags) = &package.tags {
       if !tags.is_empty() && !tags.iter().any(|tag| package_tags.contains(tag)) {
         continue;
@@ -100,5 +109,28 @@ fn main() {
         println!("Failed to install package: {}", error);
       }
     }
+  }
+
+  let files = config.files.unwrap_or_default();
+
+  println!("Found {} files", files.len());
+
+  for file in files {
+    let src = PathBuf::from(file.src);
+    let dest = PathBuf::from(file.dest);
+
+    println!();
+    println!("Symlinking file: {}", src.file_name().unwrap().to_string_lossy());
+
+    if dest.exists() && !dest.is_symlink() {
+      let mut new_dest = dest.clone();
+      new_dest.set_file_name(format!("{}.bak", dest.file_name().unwrap().to_string_lossy()));
+
+      fs::rename(dest.clone(), new_dest).unwrap();
+    }
+
+    fs::remove_file(&dest).unwrap();
+
+    fs::hard_link(src, dest).unwrap();
   }
 }
