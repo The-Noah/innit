@@ -1,6 +1,6 @@
 use std::{
   fs,
-  path::PathBuf,
+  path::{self, PathBuf},
   process::{Command, Stdio},
 };
 
@@ -41,7 +41,7 @@ struct FileLink {
 #[derive(Deserialize)]
 struct GitHubRepo {
   repo: String,
-  dest: PathBuf,
+  dest: String,
 }
 
 fn default_hard() -> bool {
@@ -150,8 +150,8 @@ fn main() {
         }
       }
       Action::FileLink(file) => {
-        let src = PathBuf::from(file.src);
-        let dest = PathBuf::from(file.dest);
+        let src = path::absolute(PathBuf::from(evaluate_vars(file.src))).unwrap();
+        let dest = path::absolute(PathBuf::from(evaluate_vars(file.dest))).unwrap();
 
         println!();
         println!("Symlinking file: {}", src.file_name().unwrap().to_string_lossy());
@@ -187,7 +187,9 @@ fn main() {
         println!();
         println!("Cloning GitHub repository {}...", repo.repo);
 
-        let mut final_dest = repo.dest.clone();
+        let dest = path::absolute(PathBuf::from(evaluate_vars(repo.dest))).unwrap();
+
+        let mut final_dest = dest.clone();
         final_dest.push(repo.repo.split("/").collect::<Vec<&str>>().last().unwrap());
 
         if final_dest.exists() {
@@ -217,7 +219,7 @@ fn main() {
         }
 
         match Command::new("git")
-          .current_dir(repo.dest)
+          .current_dir(dest)
           .arg("clone")
           .arg(format!("https://github.com/{}.git", repo.repo))
           .stdout(Stdio::null())
@@ -237,4 +239,8 @@ fn main() {
       }
     };
   }
+}
+
+fn evaluate_vars(text: String) -> String {
+  text.replace("{{ user.home }}", &dirs::home_dir().unwrap().display().to_string())
 }

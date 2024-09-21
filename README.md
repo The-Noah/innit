@@ -7,6 +7,13 @@ Innit annoying when you have to setup a new PC?
 ```yaml
 actions:
   - action: package.install
+    name: git
+    winget_id: Git.Git
+    tags:
+      - core
+      - dev
+
+  - action: package.install
     name: 1password
     winget_id: AgileBits.1Password
     tags:
@@ -27,15 +34,14 @@ actions:
     tags:
       - dev
 
-  - action: package.install
-    name: paint.net
-    winget_id: dotPDN.PaintDotNet
-    tags:
-      - tools
+  - action: github.repo
+    repo: The-Noah/dotfiles
+    dest: "{{ user.home }}"
 
   - action: file.link
-    src: C:\dotfiles\settings.json
-    dest: C:\Program Files\My App\settings.json
+    name: Windows Terminal
+    src: "{{ user.home }}/dotfiles/windows_terminal.json"
+    dest: "{{ user.home }}/AppData/Local/Packages/Microsoft.WindowsTerminal_8wekyb3d8bbwe/LocalState/settings.json"
 ```
 
 ## Usage
