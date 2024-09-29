@@ -3,7 +3,7 @@ use serde::Deserialize;
 use crate::*;
 
 #[derive(Deserialize)]
-struct CommandRun {
+pub struct CommandRun {
   command: String,
 }
 

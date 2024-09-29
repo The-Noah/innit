@@ -3,7 +3,7 @@ use serde::Deserialize;
 use crate::*;
 
 #[derive(Deserialize)]
-struct GitHubRepo {
+pub struct GitHubRepo {
   repo: String,
   dest: String,
 }
