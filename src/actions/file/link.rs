@@ -22,14 +22,16 @@ impl ActionHandler for FileLink {
     println!();
     println!("Symlinking file: {}", src.file_name().unwrap().to_string_lossy());
 
-    if dest.exists() && !dest.is_symlink() {
-      let mut new_dest = dest.clone();
-      new_dest.set_file_name(format!("{}.bak", dest.file_name().unwrap().to_string_lossy()));
+    if dest.exists() {
+      if dest.is_symlink() {
+        fs::remove_file(&dest).unwrap();
+      } else {
+        let mut new_dest = dest.clone();
+        new_dest.set_file_name(format!("{}.bak", dest.file_name().unwrap().to_string_lossy()));
 
-      fs::rename(dest.clone(), new_dest).unwrap();
+        fs::rename(dest.clone(), new_dest).unwrap();
+      }
     }
-
-    fs::remove_file(&dest).unwrap();
 
     if self.hard {
       fs::hard_link(&src, &dest).unwrap();
