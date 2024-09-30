@@ -27,6 +27,7 @@ impl ActionHandler for PackageInstall {
 
     let result = Command::new("winget")
       .arg("install")
+      .arg("--id")
       .arg(&self.winget_id)
       .arg("--exact")
       .arg("--silent")
