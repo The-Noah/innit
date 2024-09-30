@@ -15,11 +15,10 @@ fn default_hard() -> bool {
 }
 
 impl ActionHandler for FileLink {
-  fn run(&self, tags: &[String]) -> ActionResult {
+  fn run(&self) -> ActionResult {
     let src = path::absolute(PathBuf::from(evaluate_vars(&self.src))).unwrap();
     let dest = path::absolute(PathBuf::from(evaluate_vars(&self.dest))).unwrap();
 
-    println!();
     println!("Symlinking file: {}", src.file_name().unwrap().to_string_lossy());
 
     if dest.exists() {

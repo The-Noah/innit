@@ -9,8 +9,7 @@ pub struct GitHubRepo {
 }
 
 impl ActionHandler for GitHubRepo {
-  fn run(&self, tags: &[String]) -> ActionResult {
-    println!();
+  fn run(&self) -> ActionResult {
     println!("Cloning GitHub repository {}...", self.repo);
 
     let dest = path::absolute(PathBuf::from(evaluate_vars(&self.dest))).unwrap();

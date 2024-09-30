@@ -8,8 +8,7 @@ pub struct CommandRun {
 }
 
 impl ActionHandler for CommandRun {
-  fn run(&self, tags: &[String]) -> ActionResult {
-    println!();
+  fn run(&self) -> ActionResult {
     println!("Running command: {}", self.command);
 
     let result = Command::new("cmd").arg("/C").arg(self.command.clone()).stdout(Stdio::null()).status();
