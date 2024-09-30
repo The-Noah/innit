@@ -187,6 +187,7 @@ fn print_help() {
   println!();
   println!("Config:");
   println!("  If you used -c or --config, the file you specified will be used.");
-  println!("  Otherwise, $HOME/.config/innit.yaml will be used if it exists.");
-  println!("  Otherwise, $HOME/dotfiles/.config/innit.yaml will be used if it exists.");
+  println!("  Otherwise a file at one of the following locations will be used:");
+  println!("    1. $HOME/.config/innit.yaml, if it exists.");
+  println!("    2. $HOME/dotfiles/.config/innit.yaml, if it exists.");
 }
