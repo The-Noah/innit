@@ -1,9 +1,10 @@
 use std::{
   fs,
   path::{self, PathBuf},
-  process::{Command, Stdio},
+  process::{exit, Command, Stdio},
 };
 
+use dirs::home_dir;
 use serde::Deserialize;
 
 mod actions;
@@ -103,23 +104,52 @@ struct Config {
 fn main() {
   println!("{} v{}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"));
 
-  let args: Vec<String> = std::env::args().collect();
+  let args = std::env::args().collect::<Vec<String>>();
+  let args = args.split_at(1).1; // remove self from args list
 
-  if args.len() < 2 {
-    println!("Usage: {} <filename>", args[0]);
-    std::process::exit(1);
+  let config_name = if let Some(i) = args.iter().position(|arg| arg == "--config" || arg == "-c") {
+    if args.len() <= i + 1 {
+      eprintln!("You must specify a filename after config flag");
+      exit(1);
+    }
+
+    Some(args.get(i + 1).unwrap())
+  } else {
+    None
+  };
+
+  let config_path = if let Some(config_name) = config_name {
+    PathBuf::from(".").join(config_name)
+  } else {
+    let path = home_dir().unwrap().join(".config").join("innit.yaml");
+    let dotfiles_path = home_dir().unwrap().join("dotfiles").join(".config").join("innit.yaml");
+
+    if !path.exists() && dotfiles_path.exists() {
+      dotfiles_path
+    } else {
+      path
+    }
+  };
+
+  if !config_path.exists() {
+    eprintln!("Could not find config file");
+    exit(1);
   }
 
-  let filename = &args[1];
+  let contents = fs::read_to_string(&config_path).expect("Something went wrong reading the file");
 
-  let contents = std::fs::read_to_string(filename).expect("Something went wrong reading the file");
+  let tags = if let Some(i) = args.iter().position(|arg| arg == "--tags" || arg == "-t") {
+    if args.len() <= i + 1 {
+      eprintln!("You must specify a value after tags flag");
+      exit(1);
+    }
 
-  let tags = if args.len() > 3 && (args[2] == "--tags" || args[2] == "-t") {
-    args[3].split(",").map(|s| s.to_string()).collect()
+    args.get(i + 1).unwrap().split(",").map(|s| s.to_string()).collect()
   } else {
     vec![]
   };
 
+  println!("Config: {}", config_path.display());
   println!("Tags: {}", tags.join(", "));
 
   let config: Config = serde_yml::from_str(&contents).expect("Failed to parse config");
