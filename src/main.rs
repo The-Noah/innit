@@ -73,6 +73,8 @@ where
 enum Action {
   #[serde(rename = "package.install")]
   PackageInstall(ActionContainer<actions::package::Install>),
+  #[serde(rename = "file.download")]
+  FileDownload(ActionContainer<actions::file::Download>),
   #[serde(rename = "file.link")]
   FileLink(ActionContainer<actions::file::Link>),
   #[serde(rename = "github.repo")]
@@ -85,6 +87,7 @@ impl Action {
   fn inner_ref(&self) -> &dyn ActionRunner {
     match self {
       Action::PackageInstall(action) => action,
+      Action::FileDownload(action) => action,
       Action::FileLink(action) => action,
       Action::GitHubRepo(action) => action,
       Action::CommandRun(action) => action,
