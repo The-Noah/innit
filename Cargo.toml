@@ -6,7 +6,10 @@ authors = ["Noah Dunbar <noah@noahdunbar.com>"]
 description = "Innit annoying when you have to setup a new PC?"
 readme = "README.md"
 license = "MIT"
+homepage = "https://github.com/The-Noah/innit"
 repository = "https://github.com/The-Noah/innit"
+keywords = ["cli"]
+categories = ["command-line-utilities"]
 
 [dependencies]
 dirs = "5.0.1"
