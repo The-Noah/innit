@@ -27,12 +27,12 @@ impl ActionHandler for PackageInstall {
 
     let result = Command::new("winget")
       .arg("install")
-      .arg("--id")
+      .arg("--id") // use id for matching
       .arg(&self.winget_id)
-      .arg("--exact")
-      .arg("--silent")
-      .arg("--accept-package-agreements")
-      .arg("--disable-interactivity")
+      .arg("--exact") // only match the exact item
+      .arg("--silent") // request silent installation
+      .arg("--accept-package-agreements") // accept all license agreements
+      .arg("--disable-interactivity") // disable interactive prompts
       .stdout(Stdio::null())
       .status();
 
