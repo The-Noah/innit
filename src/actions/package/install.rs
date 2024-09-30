@@ -13,7 +13,7 @@ impl ActionHandler for PackageInstall {
     println!("Installing package: {}", self.name);
     println!("Winget ID: {}", self.winget_id);
 
-    let result = Command::new("winget").arg("list").arg("-q").arg(&self.winget_id).stdout(Stdio::null()).status();
+    let result = Command::new("winget").arg("list").arg("--id").arg(&self.winget_id).stdout(Stdio::null()).status();
     match result {
       Ok(status) => {
         if status.success() {
