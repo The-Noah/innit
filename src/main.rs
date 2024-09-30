@@ -102,10 +102,16 @@ struct Config {
 }
 
 fn main() {
-  println!("{} v{}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"));
-
   let args = std::env::args().collect::<Vec<String>>();
   let args = args.split_at(1).1; // remove self from args list
+
+  if args.contains(&"--help".to_string()) || args.contains(&"-h".to_string()) {
+    print_help();
+    return;
+  } else if args.contains(&"--version".to_string()) || args.contains(&"-v".to_string()) {
+    println!("{} v{}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"));
+    return;
+  }
 
   let config_name = if let Some(i) = args.iter().position(|arg| arg == "--config" || arg == "-c") {
     if args.len() <= i + 1 {
@@ -167,4 +173,20 @@ fn main() {
 
 fn evaluate_vars(text: &str) -> String {
   text.replace("{{ user.home }}", &dirs::home_dir().unwrap().display().to_string())
+}
+
+fn print_help() {
+  println!("{} v{}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"));
+  println!("Usage: {} [options]", env!("CARGO_PKG_NAME"));
+  println!();
+  println!("Options:");
+  println!("  -v, --version           Print version information.");
+  println!("  -h, --help              Print this help message.");
+  println!("  -c, --config <path>     Use specified config file.");
+  println!("  -t, --tags <tag1,tag2>  Only run actions with specified tag(s).");
+  println!();
+  println!("Config:");
+  println!("  If you used -c or --config, the file you specified will be used.");
+  println!("  Otherwise, $HOME/.config/innit.yaml will be used if it exists.");
+  println!("  Otherwise, $HOME/dotfiles/.config/innit.yaml will be used if it exists.");
 }
