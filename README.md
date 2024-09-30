@@ -2,6 +2,34 @@
 
 Innit annoying when you have to setup a new PC?
 
+## Installation
+
+```bash
+cargo install innit
+```
+
+## Usage
+
+The configuration file is automatically loaded from either `$HOME/.config/innit.yaml` or `$HOME/dotfiles/.config/innit.yaml`.
+
+Run all actions:
+
+```bash
+innit
+```
+
+Only run actions tagged with `dotfiles`:
+
+```bash
+innit -t dotfiles
+```
+
+If you need to use a custom path for the config:
+
+```bash
+innit -c /path/to/my/config.yaml
+```
+
 ## Example Config
 
 ```yaml
@@ -66,24 +94,6 @@ actions:
     platforms: [macos]
 ```
 
-## Usage
+## License
 
-The configuration file is automatically loaded from either `$HOME/.config/innit.yaml` or `$HOME/dotfiles/.config/innit.yaml`.
-
-Run all actions:
-
-```bash
-innit
-```
-
-Only run actions tagged with `dotfiles`:
-
-```bash
-innit -t dotfiles
-```
-
-If you need to use a custom path for the config:
-
-```bash
-innit -c /path/to/my/config.yaml
-```
+[MIT](LICENSE)
